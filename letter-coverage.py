@@ -1,16 +1,20 @@
 import json
+import os
 import re
 from collections import defaultdict
+from pathlib import Path
+from typing import TextIO
 
-file_names = '/home/abhilash/Downloads/tamil-data-ocr.json'
+in_dir_name = '/home/abhilash/Downloads/letter Count/dataset-json'
 
-# for sindhi, Dogri, bodo, marathi, Konkani, sanskrit, hindi use code "hi"
-# For Bengali and Assamese use "bn"
-# For Urdu and Kashmiri use ur
+language_code_mapping = {'assamese': 'bn', 'bengali': 'bn', 'english': 'en', 'gujarati': 'gu', 'bodo': 'hi', 'dogri': 'hi', 'hindi': 'hi',
+                         'konkani': 'hi', 'marathi': 'hi', 'sanskrit': 'hi', 'sindhi': 'hi', 'kannada': 'kn', 'maithali': 'mai', 'malayalam': 'ml',
+                         'manipuri': 'mni', 'nepali': 'ne', 'oriya': 'or', 'punjabi': 'pa', 'santali': 'sat', 'tamil': 'ta', 'telugu': 'te',
+                         'kashmiri': 'ur', 'urdu': 'ur'}
 
 language_dict = {
     "or": {
-        "letter_regx": r'[\u0B05-\u0B39\u0B5C-\u0B5F]',
+        "letter_regex": r'[\u0B05-\u0B39\u0B5C-\u0B5F]',
         "letter_list": ['ଅ', 'ଆ', 'ଇ', 'ଈ', 'ଉ', 'ଊ', 'ଋ', 'ଌ', 'ଏ', 'ଐ', 'ଓ', 'ଔ', 'କ', 'ଖ', 'ଗ', 'ଘ', 'ଙ', 'ଚ', 'ଛ', 'ଜ', 'ଝ', 'ଞ',
                         'ଟ', 'ଠ', 'ଡ',
                         'ଢ', 'ଣ', 'ତ', 'ଥ', 'ଦ', 'ଧ', 'ନ', 'ପ', 'ଫ', 'ବ', 'ଭ', 'ମ', 'ଯ', 'ର', 'ଲ', 'ଳ', 'ବ', 'ଶ', 'ଷ', 'ସ', 'ହ', 'ଡ଼',
@@ -21,7 +25,7 @@ language_dict = {
         "number_list": ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯']
     },
     "ta": {
-        "letter_regx": r'[\u0B85-\u0BB9]',
+        "letter_regex": r'[\u0B85-\u0BB9]',
         "letter_list": ['அ', 'ஆ', 'இ', 'ஈ', 'உ', 'ஊ', 'எ', 'ஏ', 'ஐ', 'ஒ', 'ஓ', 'ஔ', 'க', 'ங', 'ச', 'ஜ', 'ஞ', 'ட', 'ண', 'த', 'ந', 'ன',
                         'ப', 'ம', 'ய', 'ர', 'ற', 'ல', 'ள', 'ழ', 'வ', 'ஶ', 'ஷ', 'ஸ', 'ஹ'],
         "sign_regex": r'[\u0BBE-\u0BC8\u0BCA-\u0BCD\u0BD0-\u0BD7]',
@@ -30,7 +34,7 @@ language_dict = {
         "number_list": ['௦', '௧', '௨', '௩', '௪', '௫', '௬', '௭', '௮', '௯']
     },
     "en": {
-        "letter_regx": r'[A-Za-z]',
+        "letter_regex": r'[A-Za-z]',
         "letter_list": ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                         'W', 'X', 'Y',
                         'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u',
@@ -206,17 +210,41 @@ language_dict = {
 }
 
 
-class JsonRead:
+def generate_letter_coverage_file(dir_name):
+    for root, dirs, files in os.walk(dir_name):
+        # print("root: ", root)
+        # print("dirs: ",dirs)
+        # print("files: ",files)
+        if root == dir_name:
+            for file in files:
+                file_name = os.path.basename(file)
+                language_code = get_language_code(file_name)
+                if language_code:
+                    print(f"Processing File: {root +'/'+ file_name} and language: {language_code}")
+                    JsonRead(file_name= root +'/'+ file_name, language=language_code).file_read()
+                else:
+                    print("Skipping file: ", file_name)
 
+
+def get_language_code(file_name):
+    language_code = None
+    for language in language_code_mapping:
+        if language in file_name:
+            return language_code_mapping[language]
+    return language_code
+
+
+class JsonRead:
     def __init__(self, file_name, language) -> None:
         self.file_name = file_name
         self.language = language
-        self.letter_regx = language_dict[language]['letter_regx']
-        self.sign_regex = language_dict[language]['sign_regex']
-        self.number_regex = language_dict[language]['number_regex']
+        self.letter_regx = language_dict[language]["letter_regex"]
+        self.sign_regex = language_dict[language]["sign_regex"]
+        self.number_regex = language_dict[language]["number_regex"]
 
     def file_read(self):
-        with open(self.file_name, 'r', encoding='utf8') as f:
+
+        with open(self.file_name, "r", encoding="utf8") as f:
             contents = f.read()
             language = self.language
             letter_regx = self.letter_regx
@@ -227,8 +255,13 @@ class JsonRead:
 
             font_map = defaultdict(dict)
             for file in final_dictionary:
-                text = file["groundTruth"]
+                try:
+                    text = file["groundTruth"]
+                except:
+                    print("Skipping Processing...")
+                    continue
                 font = file["fontName"]
+                # print(text)
 
                 letters = re.findall(letter_regx, text)
                 letter_count = defaultdict(int)
@@ -237,7 +270,10 @@ class JsonRead:
 
                 numbers = re.findall(number_regex, text)
                 number_count = defaultdict(int)
+                # if len(numbers):
+                #     # print(text)
                 for n in numbers:
+                    # print(n)
                     number_count[n] += 1
 
                 signs = re.findall(sign_regex, text)
@@ -259,44 +295,47 @@ class JsonRead:
 
             for font in font_map:
                 missing_letter = []
-                for letter in language_dict[language]['letter_list']:
-                    if letter not in font_map[font]['letter']:
+                for letter in language_dict[language]["letter_list"]:
+                    if letter not in font_map[font]["letter"]:
                         missing_letter.append(letter)
 
                 missing_sign = []
-                for sign in language_dict[language]['sign_list']:
-                    if sign not in font_map[font]['sign']:
+                for sign in language_dict[language]["sign_list"]:
+                    if sign not in font_map[font]["sign"]:
                         missing_sign.append(sign)
 
                 missing_number = []
-                for no in language_dict[language]['number_list']:
-                    if no not in font_map[font]['number']:
+                for no in language_dict[language]["number_list"]:
+                    if no not in font_map[font]["number"]:
                         missing_number.append(no)
 
                 font_map[font]["missing_letter"] = missing_letter
-                font_map[font]["covered_letter_percentage"] = (len(font_map[font]['letter']) / len(language_dict[language]['letter_list'])) * 100
+                font_map[font]["covered_letter_percentage"] = (
+                                                                      len(font_map[font]["letter"])
+                                                                      / len(language_dict[language]["letter_list"])
+                                                              ) * 100
 
                 font_map[font]["missing_sign"] = missing_sign
-                font_map[font]["covered_sign_percentage"] = (len(font_map[font]['sign']) / len(language_dict[language]['sign_list'])) * 100
+                font_map[font]["covered_sign_percentage"] = (
+                                                                    len(font_map[font]["sign"])
+                                                                    / len(language_dict[language]["sign_list"])
+                                                            ) * 100
 
                 font_map[font]["missing_number"] = missing_number
-                font_map[font]["covered_number_percentage"] = (len(font_map[font]['number']) / len(language_dict[language]['number_list'])) * 100
+                font_map[font]["covered_number_percentage"] = (
+                                                                      len(font_map[font]["number"])
+                                                                      / len(language_dict[language]["number_list"])
+                                                              ) * 100
 
-            out_file_name = '/home/abhilash/Downloads/' + self.language + '_count.json'
-            out_file = open(out_file_name, 'w')
+            out_dir = Path(self.file_name).parent / "output"
+            out_dir.mkdir(exist_ok=True)
+            out_file = open(
+                out_dir.__str__()
+                + f"/{Path(self.file_name).name.split('-')[0]}_{language}_count.json",
+                "w",
+            )
             json.dump(font_map, out_file, indent=6)
 
 
 if __name__ == "__main__":
-    j = JsonRead(file_name=file_names, language='ta')
-    j.file_read()
-
-# >>> import re
-# >>> re.findall(r'[\u0B05-\u0B34]','ଚାଲିଥିଲାବେଳେ' )
-# ['ଚ', 'ଲ', 'ଥ', 'ଲ', 'ବ', 'ଳ']
-# >>> re.findall(r'[\u0B05-\u0B34]','ଚାଲିଥିଲାବେଳେ ଓଡ଼ିଶା ଏହି ମହାସ୍ରୋତରୁ ବାଦ୍ ପଡ଼ିନଥିଲା ।' )
-# ['ଚ', 'ଲ', 'ଥ', 'ଲ', 'ବ', 'ଳ', 'ଓ', 'ଡ', 'ଏ', 'ମ', 'ର', 'ତ', 'ର', 'ବ', 'ଦ', 'ପ', 'ଡ', 'ନ', 'ଥ', 'ଲ']
-# >>> re.findall(r'[\u0B05-\u0B34, \u0B3E-\u0B48]','ଚାଲିଥିଲାବେଳେ ଓଡ଼ିଶା ଏହି ମହାସ୍ରୋତରୁ ବାଦ୍ ପଡ଼ିନଥିଲା ।' )
-# ['ଚ', 'ା', 'ଲ', 'ି', 'ଥ', 'ି', 'ଲ', 'ା', 'ବ', 'େ', 'ଳ', 'େ', ' ', 'ଓ', 'ଡ', 'ି', 'ା', ' ', 'ଏ', 'ି', ' ', 'ମ', 'ା', 'ର', 'ତ', 'ର', 'ୁ', ' ', 'ବ', 'ା', 'ଦ', ' ', 'ପ', 'ଡ', 'ି', 'ନ', 'ଥ', 'ି', 'ଲ', 'ା', ' ']
-# >>> re.findall(r'[\u0B05-\u0B34,\u0B3E-\u0B48]','ଚାଲିଥିଲାବେଳେ ଓଡ଼ିଶା ଏହି ମହାସ୍ରୋତରୁ ବାଦ୍ ପଡ଼ିନଥିଲା ।' )
-# ['ଚ', 'ା', 'ଲ', 'ି', 'ଥ', 'ି', 'ଲ', 'ା', 'ବ', 'େ', 'ଳ', 'େ', 'ଓ', 'ଡ', 'ି', 'ା', 'ଏ', 'ି', 'ମ', 'ା', 'ର', 'ତ', 'ର', 'ୁ', 'ବ', 'ା', 'ଦ', 'ପ', 'ଡ', 'ି', 'ନ', 'ଥ', 'ି', 'ଲ', 'ା']
+    generate_letter_coverage_file(in_dir_name)
